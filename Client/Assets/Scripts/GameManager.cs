@@ -128,18 +128,43 @@ public class GameManager : MonoBehaviour
 
     private void Start()
     {
-        if (singleton != null && singleton != this)
+        networkSettings = FindObjectOfType<NetworkSettings>();
+
+        Settings.musicVolume = PlayerPrefs.GetFloat("MusicVolume", 1f);
+        Settings.soundVolume = PlayerPrefs.GetFloat("SoundVolume", 1f);
+        Settings.language = PlayerPrefs.GetString("Language", "english");
+
+        musicSlider.value = Settings.musicVolume;
+        soundSlider.value = Settings.soundVolume;
+
+        audioSource = GetComponent<AudioSource>();
+        audioSource.volume = Settings.musicVolume;
+        audioSource.Play();
+
+        Language.LoadLanguage(Settings.language);
+
+        if (panel_Game)
         {
-            Destroy(gameObject);
-            return;
+            canvasObj = panel_Game.gameObject.GetComponentInParent<Canvas>();
+            canvas = canvasObj.GetComponent<CanvasScaler>();
         }
+        
+        // === ADDED UI ENHANCEMENT INDICATOR === //
+        CreateUIEnhancementIndicator();
+        // === END ADDED UI ENHANCEMENT INDICATOR === //
 
-        DontDestroyOnLoad(this);
-        DontDestroyOnLoad(gameObject);
-
-        Application.targetFrameRate = 60;
-
-        singleton = this;
+        if (settings != null)
+        {
+            // Update language dropdown
+            for (int i = 0; i < settings.languages.Length; i++)
+            {
+                if (Settings.language == settings.languages[i])
+                {
+                    languageDropdown.value = i;
+                    break;
+                }
+            }
+        }
 
         panel_Main.Open();
         panel_Lobby.Open(false);
@@ -152,10 +177,67 @@ public class GameManager : MonoBehaviour
         panel_Leave.Open(false);
         panel_Counter.Open(false);
         panel_Heroes.Open(false);
-        menuEffect.SetActive(true);
 
-        LoadGame();
+        StartClient();
     }
+    
+    // === UI ENHANCEMENT INDICATOR === //
+    private void CreateUIEnhancementIndicator()
+    {
+        // Create a visual indicator that our UI enhancements are active
+        if (canvasObj == null) return;
+        
+        // Check if indicator already exists
+        if (canvasObj.transform.Find("UIEnhancementIndicator") != null) return;
+        
+        // Create the indicator GameObject
+        GameObject indicator = new GameObject("UIEnhancementIndicator");
+        indicator.transform.SetParent(canvasObj.transform, false);
+        
+        // Add a RectTransform component
+        RectTransform rectTransform = indicator.AddComponent<RectTransform>();
+        rectTransform.anchorMin = new Vector2(0, 1);
+        rectTransform.anchorMax = new Vector2(0, 1);
+        rectTransform.pivot = new Vector2(0, 1);
+        rectTransform.anchoredPosition = new Vector2(10, -10);
+        rectTransform.sizeDelta = new Vector2(15, 15);
+        
+        // Add an Image component
+        Image image = indicator.AddComponent<Image>();
+        image.color = new Color(0, 0.8f, 1f, 0.8f);  // Bright blue
+        
+        // Try to make it circular
+        image.sprite = Resources.GetBuiltinResource<Sprite>("UI/Skin/Knob.psd");
+        
+        // Add version text label
+        GameObject versionLabel = new GameObject("VersionLabel");
+        versionLabel.transform.SetParent(canvasObj.transform, false);
+        
+        // Position the version label
+        RectTransform labelRect = versionLabel.AddComponent<RectTransform>();
+        labelRect.anchorMin = new Vector2(0, 1);
+        labelRect.anchorMax = new Vector2(0, 1);
+        labelRect.pivot = new Vector2(0, 1);
+        labelRect.anchoredPosition = new Vector2(30, -10);
+        labelRect.sizeDelta = new Vector2(200, 20);
+        
+        // Add text component
+        Text versionText = versionLabel.AddComponent<Text>();
+        versionText.text = "UI v2.0 (10/30/2023)";
+        versionText.fontSize = 14;
+        versionText.color = new Color(0, 0.8f, 1f, 0.8f);  // Match indicator color
+        
+        // Set font
+        versionText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        
+        // Add outline for better visibility
+        Outline outline = versionLabel.AddComponent<Outline>();
+        outline.effectColor = Color.black;
+        outline.effectDistance = new Vector2(1, -1);
+        
+        Debug.Log("UI Enhancement Indicator created - UI enhancements v2.0 active");
+    }
+    // === END UI ENHANCEMENT INDICATOR === //
 
     bool gameLoaded = false;
     void LoadGame()
