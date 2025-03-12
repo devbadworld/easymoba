@@ -9,157 +9,146 @@ using UnityEngine.EventSystems;
 using System.Collections;
 
 /// <summary>
-/// Modern UI Button with hover effects, animations, and sound feedback.
+/// Modern UI Button with enhanced visuals and interactions.
+/// Extends the standard button with hover effects, animations, and sound feedback.
 /// </summary>
-public class ModernUIButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
+public class ModernUIButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler 
 {
-    [Header("Animation Settings")]
-    public bool enableAnimation = true;
-    public float hoverScaleMultiplier = 1.05f;
-    public float clickScaleMultiplier = 0.95f;
-    public float animationSpeed = 10f;
+    [Header("Button References")]
+    public Button button;
+    public RectTransform buttonRect;
+    public Text buttonText;
+    public Image buttonImage;
+    
+    [Header("Visual Effects")]
+    public bool useHoverEffect = true;
+    public bool useClickEffect = true;
+    public bool useRippleEffect = true;
+    public float hoverScaleFactor = 1.05f;
+    public float clickScaleFactor = 0.95f;
     
     [Header("Color Settings")]
-    public bool useColorTransition = true;
-    public Color normalColor = Color.white;
-    public Color hoverColor = new Color(0.9f, 0.9f, 1f);
-    public Color pressedColor = new Color(0.7f, 0.7f, 0.8f);
+    public Color normalColor = new Color(0.1f, 0.6f, 0.9f, 1f);
+    public Color hoverColor = new Color(0.3f, 0.7f, 1f, 1f);
+    public Color pressedColor = new Color(0.08f, 0.5f, 0.8f, 1f);
     public Color disabledColor = new Color(0.5f, 0.5f, 0.5f, 0.5f);
     
-    [Header("Sound and Effects")]
+    [Header("Audio")]
     public bool useSound = true;
-    public bool useRippleEffect = false;
-    public GameObject rippleEffectPrefab;
-    
-    [Header("Border Effects")]
-    public bool useBorderAnimation = false;
-    public Image borderImage;
-    public float borderGlowIntensity = 0.2f;
-    public Color borderGlowColor = new Color(1f, 1f, 1f, 0.5f);
+    public AudioClip hoverSound;
+    public AudioClip clickSound;
     
     // Private variables
     private Vector3 originalScale;
-    private Vector3 targetScale;
-    private Image buttonImage;
-    private Button unityButton;
-    private Color originalBorderColor;
-    private bool isInteractable = true;
+    private Color originalTextColor;
+    private bool isPointerOver = false;
+    private bool isPointerDown = false;
+    private AudioSource audioSource;
+    private EnhancedUIManager uiManager;
     
-    private void Awake()
+    void Awake()
     {
-        buttonImage = GetComponent<Image>();
-        unityButton = GetComponent<Button>();
+        // Get component references if not set
+        if (button == null) button = GetComponent<Button>();
+        if (buttonRect == null) buttonRect = GetComponent<RectTransform>();
+        if (buttonText == null) buttonText = GetComponentInChildren<Text>();
+        if (buttonImage == null) buttonImage = GetComponent<Image>();
         
-        if (borderImage != null)
-        {
-            originalBorderColor = borderImage.color;
-        }
-    }
-    
-    private void Start()
-    {
-        originalScale = transform.localScale;
-        targetScale = originalScale;
+        // Store original values
+        if (buttonRect) originalScale = buttonRect.localScale;
+        if (buttonText) originalTextColor = buttonText.color;
         
-        // If we have a Unity Button component, monitor its interactable property
-        if (unityButton != null)
+        // Create audio source if needed
+        if (useSound && audioSource == null)
         {
-            isInteractable = unityButton.interactable;
-            
-            // Set initial color based on interactable state
-            if (useColorTransition && buttonImage != null)
-            {
-                buttonImage.color = isInteractable ? normalColor : disabledColor;
-            }
-        }
-    }
-    
-    private void Update()
-    {
-        // Check if interactable state has changed
-        if (unityButton != null && unityButton.interactable != isInteractable)
-        {
-            isInteractable = unityButton.interactable;
-            
-            if (useColorTransition && buttonImage != null)
-            {
-                buttonImage.color = isInteractable ? normalColor : disabledColor;
-            }
-            
-            // Reset scale if disabled
-            if (!isInteractable)
-            {
-                targetScale = originalScale;
-            }
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
         }
         
-        // Animate scale
-        if (enableAnimation && transform.localScale != targetScale)
-        {
-            transform.localScale = Vector3.Lerp(transform.localScale, targetScale, Time.deltaTime * animationSpeed);
-        }
+        // Try to find UI Manager
+        uiManager = FindObjectOfType<EnhancedUIManager>();
     }
     
+    void OnEnable()
+    {
+        // Reset state
+        isPointerOver = false;
+        isPointerDown = false;
+        
+        // Reset scale
+        if (buttonRect) buttonRect.localScale = originalScale;
+        
+        // Apply initial color based on button state
+        UpdateVisualState();
+    }
+    
+    // Implement pointer event handlers
     public void OnPointerEnter(PointerEventData eventData)
     {
-        if (!isInteractable) return;
+        if (!button.interactable) return;
         
-        if (enableAnimation)
+        isPointerOver = true;
+        
+        if (useHoverEffect && buttonRect)
         {
-            targetScale = originalScale * hoverScaleMultiplier;
+            // Scale up effect
+            buttonRect.localScale = originalScale * hoverScaleFactor;
         }
         
-        if (useColorTransition && buttonImage != null)
-        {
-            buttonImage.color = hoverColor;
-        }
+        // Update colors
+        UpdateVisualState();
         
-        if (useBorderAnimation && borderImage != null)
+        // Play hover sound
+        if (useSound && hoverSound != null && audioSource != null)
         {
-            borderImage.color = borderGlowColor;
+            audioSource.PlayOneShot(hoverSound);
+        }
+        else if (uiManager != null)
+        {
+            // Use UI Manager sound if available
+            uiManager.PlayButtonClickSound();
         }
     }
     
     public void OnPointerExit(PointerEventData eventData)
     {
-        if (!isInteractable) return;
+        if (!button.interactable) return;
         
-        if (enableAnimation)
+        isPointerOver = false;
+        
+        if (useHoverEffect && buttonRect)
         {
-            targetScale = originalScale;
+            // Restore original scale
+            buttonRect.localScale = originalScale;
         }
         
-        if (useColorTransition && buttonImage != null)
-        {
-            buttonImage.color = normalColor;
-        }
-        
-        if (useBorderAnimation && borderImage != null)
-        {
-            borderImage.color = originalBorderColor;
-        }
+        // Update colors
+        UpdateVisualState();
     }
     
     public void OnPointerDown(PointerEventData eventData)
     {
-        if (!isInteractable) return;
+        if (!button.interactable) return;
         
-        if (enableAnimation)
+        isPointerDown = true;
+        
+        if (useClickEffect && buttonRect)
         {
-            targetScale = originalScale * clickScaleMultiplier;
+            // Scale down effect
+            buttonRect.localScale = originalScale * clickScaleFactor;
         }
         
-        if (useColorTransition && buttonImage != null)
+        // Update colors
+        UpdateVisualState();
+        
+        // Play click sound
+        if (useSound && clickSound != null && audioSource != null)
         {
-            buttonImage.color = pressedColor;
+            audioSource.PlayOneShot(clickSound);
         }
         
-        if (useSound && EnhancedUIManager.instance != null)
-        {
-            EnhancedUIManager.instance.PlayButtonClickSound();
-        }
-        
-        if (useRippleEffect && rippleEffectPrefab != null)
+        // Create ripple effect
+        if (useRippleEffect)
         {
             CreateRippleEffect(eventData.position);
         }
@@ -167,126 +156,67 @@ public class ModernUIButton : MonoBehaviour, IPointerEnterHandler, IPointerExitH
     
     public void OnPointerUp(PointerEventData eventData)
     {
-        if (!isInteractable) return;
+        if (!button.interactable) return;
         
-        if (enableAnimation)
+        isPointerDown = false;
+        
+        if (useClickEffect && buttonRect)
         {
-            // If still hovering, go to hover scale, otherwise back to normal
-            if (RectTransformUtility.RectangleContainsScreenPoint(
-                transform as RectTransform, eventData.position, eventData.pressEventCamera))
+            // Return to hover or normal scale
+            if (isPointerOver)
             {
-                targetScale = originalScale * hoverScaleMultiplier;
-                
-                if (useColorTransition && buttonImage != null)
-                {
-                    buttonImage.color = hoverColor;
-                }
+                buttonRect.localScale = originalScale * hoverScaleFactor;
             }
             else
             {
-                targetScale = originalScale;
-                
-                if (useColorTransition && buttonImage != null)
-                {
-                    buttonImage.color = normalColor;
-                }
-                
-                if (useBorderAnimation && borderImage != null)
-                {
-                    borderImage.color = originalBorderColor;
-                }
+                buttonRect.localScale = originalScale;
             }
+        }
+        
+        // Update colors
+        UpdateVisualState();
+    }
+    
+    private void UpdateVisualState()
+    {
+        if (buttonImage == null) return;
+        
+        // Set button colors based on state
+        if (!button.interactable)
+        {
+            buttonImage.color = disabledColor;
+        }
+        else if (isPointerDown)
+        {
+            buttonImage.color = pressedColor;
+        }
+        else if (isPointerOver)
+        {
+            buttonImage.color = hoverColor;
+        }
+        else
+        {
+            buttonImage.color = normalColor;
+        }
+        
+        // Update text color for better contrast
+        if (buttonText != null)
+        {
+            // Make text slightly brighter for better contrast
+            buttonText.color = new Color(
+                Mathf.Min(buttonImage.color.r + 0.3f, 1f),
+                Mathf.Min(buttonImage.color.g + 0.3f, 1f),
+                Mathf.Min(buttonImage.color.b + 0.3f, 1f),
+                1f
+            );
         }
     }
     
     private void CreateRippleEffect(Vector2 position)
     {
-        if (rippleEffectPrefab == null) return;
+        if (uiManager == null) return;
         
-        // Convert screen position to local position
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            transform as RectTransform, position, null, out Vector2 localPoint);
-            
-        // Create ripple effect
-        GameObject ripple = Instantiate(rippleEffectPrefab, transform);
-        ripple.transform.localPosition = localPoint;
-        
-        // Start ripple animation
-        StartCoroutine(AnimateRipple(ripple));
-    }
-    
-    private IEnumerator AnimateRipple(GameObject ripple)
-    {
-        // Get ripple components
-        RectTransform rippleRect = ripple.GetComponent<RectTransform>();
-        Image rippleImage = ripple.GetComponent<Image>();
-        
-        if (rippleRect == null || rippleImage == null)
-        {
-            Destroy(ripple);
-            yield break;
-        }
-        
-        // Start with small transparent circle
-        rippleRect.sizeDelta = new Vector2(0, 0);
-        Color startColor = rippleImage.color;
-        rippleImage.color = new Color(startColor.r, startColor.g, startColor.b, 0.8f);
-        
-        // Calculate target size (diagonal of the button)
-        RectTransform buttonRect = transform as RectTransform;
-        float targetSize = Mathf.Sqrt(
-            buttonRect.rect.width * buttonRect.rect.width +
-            buttonRect.rect.height * buttonRect.rect.height) * 2f;
-        
-        // Animate expansion
-        float duration = 0.5f;
-        float timer = 0;
-        
-        while (timer < duration)
-        {
-            timer += Time.deltaTime;
-            float t = timer / duration;
-            
-            // Scale up
-            float currentSize = Mathf.Lerp(0, targetSize, t);
-            rippleRect.sizeDelta = new Vector2(currentSize, currentSize);
-            
-            // Fade out
-            float alpha = Mathf.Lerp(0.8f, 0f, t);
-            rippleImage.color = new Color(startColor.r, startColor.g, startColor.b, alpha);
-            
-            yield return null;
-        }
-        
-        Destroy(ripple);
-    }
-    
-    /// <summary>
-    /// Set the button's interactable state
-    /// </summary>
-    public void SetInteractable(bool interactable)
-    {
-        isInteractable = interactable;
-        
-        if (unityButton != null)
-        {
-            unityButton.interactable = interactable;
-        }
-        
-        if (useColorTransition && buttonImage != null)
-        {
-            buttonImage.color = interactable ? normalColor : disabledColor;
-        }
-        
-        if (!interactable)
-        {
-            targetScale = originalScale;
-            transform.localScale = originalScale;
-            
-            if (useBorderAnimation && borderImage != null)
-            {
-                borderImage.color = originalBorderColor;
-            }
-        }
+        // Use UI Manager to create effect at the click position
+        uiManager.ShowButtonClickEffect(transform.position);
     }
 } 

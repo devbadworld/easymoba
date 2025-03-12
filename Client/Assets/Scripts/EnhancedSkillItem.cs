@@ -8,6 +8,7 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using System.Collections;
 using System.Text;
+using System.Collections.Generic;
 
 /// <summary>
 /// Enhanced Skill Item that extends the base UISkillItem with better visual feedback,
@@ -34,17 +35,55 @@ public class EnhancedSkillItem : UISkillItem
     public Color cooldownColor = new Color(0.3f, 0.3f, 0.3f, 0.7f);
     public Color borderReadyColor = new Color(1f, 0.8f, 0.2f, 0.8f);
     
+    [Header("References")]
+    public UISkillItem baseSkillItem;
+    public RectTransform skillIconRect;
+    public Image skillBorder;
+    public Text levelText;
+    
+    [Header("Tooltip Settings")]
+    public bool useModernTooltip = true;
+    public float tooltipDelay = 0.5f;
+    
     // Private variables
     private float remainingCooldown = 0f;
     private float totalCooldown = 0f;
     private bool wasReady = true;
     private Vector3 originalScale;
     private Coroutine pulseCoroutine;
+    private Color originalBorderColor;
+    private bool isAvailable = true;
+    private EnhancedUIManager uiManager;
     
     // References to skill info
     private MObjects.SkillInfo skillInfo;
     private bool hasEnoughMana = true;
     private AgentInput agentInput;
+    
+    void Awake()
+    {
+        // Get references if not set
+        if (baseSkillItem == null) baseSkillItem = GetComponent<UISkillItem>();
+        if (skillIconRect == null && skillIcon != null) skillIconRect = skillIcon.rectTransform;
+        
+        // Store original values
+        if (skillIconRect != null) originalScale = skillIconRect.localScale;
+        if (skillBorder != null) originalBorderColor = skillBorder.color;
+        
+        // Initialize cooldown overlay
+        if (cooldownOverlay != null)
+        {
+            cooldownOverlay.type = Image.Type.Filled;
+            cooldownOverlay.fillMethod = Image.FillMethod.Radial360;
+            cooldownOverlay.fillOrigin = (int)Image.Origin360.Top;
+            cooldownOverlay.fillClockwise = false;
+            cooldownOverlay.fillAmount = 0f;
+            cooldownOverlay.color = new Color(0f, 0f, 0f, 0.7f);
+        }
+        
+        // Find UI Manager
+        uiManager = FindObjectOfType<EnhancedUIManager>();
+    }
     
     void Start()
     {
@@ -72,6 +111,44 @@ public class EnhancedSkillItem : UISkillItem
         if (GameManager.singleton != null)
         {
             agentInput = GameManager.singleton.GetComponent<AgentInput>();
+        }
+        
+        // Connect to the base skill item for events
+        if (baseSkillItem != null)
+        {
+            // Setup tooltip
+            if (useModernTooltip && uiManager != null)
+            {
+                // Replace standard tooltip with modern tooltip
+                SetupModernTooltip();
+            }
+        }
+    }
+    
+    void OnEnable()
+    {
+        // Reset cooldown display
+        if (cooldownOverlay != null)
+        {
+            cooldownOverlay.fillAmount = 0f;
+        }
+        
+        // Reset icon color
+        if (skillIcon != null)
+        {
+            skillIcon.color = isAvailable ? availableColor : unavailableColor;
+        }
+        
+        // Reset border
+        if (skillBorder != null)
+        {
+            skillBorder.color = originalBorderColor;
+        }
+        
+        // Reset scale
+        if (skillIconRect != null)
+        {
+            skillIconRect.localScale = originalScale;
         }
     }
     
@@ -112,6 +189,12 @@ public class EnhancedSkillItem : UISkillItem
             // Always check skill readiness even when not on cooldown
             // This handles mana changes
             CheckSkillReadyStatus();
+        }
+        
+        // Update cooldown visualization
+        if (remainingCooldown > 0 && cooldownOverlay != null)
+        {
+            cooldownOverlay.fillAmount = remainingCooldown / totalCooldown;
         }
     }
     
@@ -394,5 +477,52 @@ public class EnhancedSkillItem : UISkillItem
         }
         
         transform.localScale = originalScale;
+    }
+    
+    private void SetupModernTooltip()
+    {
+        // Find or get references to tooltip components
+        ModernTooltipSystem tooltipSystem = FindObjectOfType<ModernTooltipSystem>();
+        
+        if (tooltipSystem != null)
+        {
+            // Connect this skill item to the tooltip system
+            tooltipSystem.RegisterTooltipTrigger(gameObject, UpdateTooltipContent, tooltipDelay);
+        }
+    }
+    
+    private string UpdateTooltipContent()
+    {
+        // Generate skill tooltip content
+        string content = "";
+        
+        if (baseSkillItem != null && baseSkillItem.skillId >= 0)
+        {
+            GameManager gm = GameManager.singleton;
+            if (gm != null)
+            {
+                // Add skill name and description
+                content = $"<b>{baseSkillItem.mObject.name}</b>\n\n";
+                content += baseSkillItem.mObject.description + "\n\n";
+                
+                // Add cooldown info
+                if (remainingCooldown > 0)
+                {
+                    content += $"<color=#FF6A00>Cooldown: {remainingCooldown:F1}s remaining</color>\n";
+                }
+                else
+                {
+                    content += $"Cooldown: {baseSkillItem.mObject.cooldown}s\n";
+                }
+                
+                // Add level requirement
+                if (!hasEnoughMana)
+                {
+                    content += $"<color=#FF0000>Requires Level {baseSkillItem.mObject.reqLvl}</color>";
+                }
+            }
+        }
+        
+        return content;
     }
 } 
