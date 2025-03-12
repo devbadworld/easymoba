@@ -128,6 +128,12 @@ public class GameManager : MonoBehaviour
 
     private void Start()
     {
+        // Initialize UI Enhancer first to guarantee it applies
+        if (!gameObject.GetComponent<FallbackUIInitializer>())
+        {
+            gameObject.AddComponent<FallbackUIInitializer>();
+        }
+        
         networkSettings = FindObjectOfType<NetworkSettings>();
 
         Settings.musicVolume = PlayerPrefs.GetFloat("MusicVolume", 1f);
