@@ -22,6 +22,15 @@ public class EnhancedUIManager : MonoBehaviour
     public Color accentColor = new Color(0.9f, 0.8f, 0.1f, 1f);
     public Color neutralColor = new Color(0.7f, 0.7f, 0.7f, 1f);
     
+    [Header("Font Settings")]
+    public string primaryFontName = "Riffic";
+    public string secondaryFontName = "Arial";
+    public float defaultFontSize = 16f;
+    public float titleFontSize = 24f;
+    public float smallFontSize = 12f;
+    public bool useModernFontRendering = true;
+    public Color fontColor = new Color(0.9f, 0.9f, 0.9f, 1f);
+    
     [Header("Animation Settings")]
     public float defaultTransitionSpeed = 0.3f;
     public float fastTransitionSpeed = 0.15f;
@@ -129,6 +138,42 @@ public class EnhancedUIManager : MonoBehaviour
         if (buttonClickSound != null)
         {
             audioSource.PlayOneShot(buttonClickSound);
+        }
+    }
+    
+    /// <summary>
+    /// Apply font settings to a Text component
+    /// </summary>
+    public void ApplyFontSettings(Text textComponent, string fontStyle = "normal")
+    {
+        if (textComponent == null) return;
+        
+        // Set font size based on style
+        switch (fontStyle.ToLower())
+        {
+            case "title":
+                textComponent.fontSize = Mathf.RoundToInt(titleFontSize);
+                textComponent.fontStyle = FontStyle.Bold;
+                break;
+            case "small":
+                textComponent.fontSize = Mathf.RoundToInt(smallFontSize);
+                textComponent.fontStyle = FontStyle.Normal;
+                break;
+            default:
+                textComponent.fontSize = Mathf.RoundToInt(defaultFontSize);
+                textComponent.fontStyle = FontStyle.Normal;
+                break;
+        }
+        
+        // Apply font color
+        textComponent.color = fontColor;
+        
+        // Apply other text rendering improvements
+        if (useModernFontRendering)
+        {
+            textComponent.material = Resources.Load<Material>("UI/ModernTextMaterial");
+            textComponent.horizontalOverflow = HorizontalWrapMode.Overflow;
+            textComponent.verticalOverflow = VerticalWrapMode.Overflow;
         }
     }
     
